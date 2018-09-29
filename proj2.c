@@ -7,6 +7,7 @@
 
 #define MAX_LINE 80
 
+//helps me add a character to a string because working with strings in C kinda sucks a little bit
 char *append(char *str1, char character){
 	char *new_string = malloc(100);
 	sprintf(new_string, "%s%c", str1, character);
@@ -68,6 +69,22 @@ char *processURL(char *url){
 		return "invalid";
 }
 
+void printDetails(char *processed_url, char *output_filename){
+	char *token = strtok(processed_url, " ");
+	char *labels[4] = {"hostname", "port", "web_filename"};
+	int i=0;
+	token = strtok(NULL, " ");
+	
+	while(token != NULL){
+		printf("DET: %s = %s\n", labels[i], token);
+		fflush(stdout);
+		token = strtok(NULL, " ");
+		i++;
+	}
+	printf("DET: output_filename = %s\n", output_filename);
+	fflush(stdout);
+}
+
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
 	bool valid = true; 				//No invalid args, includes URL, etc.
@@ -79,7 +96,7 @@ int main(int argc, char *argv[]){
 	
 	//Strings for output file location and url
 	char *url = "";
-	char *contents_file = "";
+	char *output_filename = "";
 	
 	//check for flags/invalid arguments
 	for(int i=1; argv[i] != NULL; i++){
@@ -105,7 +122,7 @@ int main(int argc, char *argv[]){
 				case 'o':
 					save_contents = true;
 					i++;
-					contents_file = argv[i];
+					output_filename = argv[i];
 					break;
 				default:
 					valid = false;
@@ -114,15 +131,19 @@ int main(int argc, char *argv[]){
 		}else{
 			valid = false;
 		}
-		
-		printf("%d\n", valid);
+	}
+	printf("%d\n", valid);
 		printf("%d %s\n", url_present, url);
 		printf("%d\n", print_details);
 		printf("%d\n", print_request);
 		printf("%d\n", print_response);
-		printf("%d %s\n", save_contents, contents_file);
-	}
+		printf("%d %s\n", save_contents, output_filename);
+	
+	
 	if(valid){
+		if(print_details){
+			printDetails(url, output_filename);
+		}
 	}
 	
 	
