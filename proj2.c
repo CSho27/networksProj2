@@ -3,11 +3,69 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #define MAX_LINE 80
 
-int urlValid(char *url){
+char *append(char *str1, char character){
+	char *new_string = malloc(100);
+	sprintf(new_string, "%s%c", str1, character);
+	return new_string;
+}
+
+//This checks the validity of the url and breaks the arguments into a form that strtok can easily make an array
+char *processURL(char *url){
+	char *processed_url = malloc(100);
+	bool valid = true;
+	const int url_http_length = 7;
 	
+	//checking for correct "http://"
+	for(int i=0; i<7; i++){
+		processed_url = append(processed_url, url[i]);
+	}
+	if(strncasecmp(processed_url, "http://", url_http_length) != 0)
+		valid = false;
+	
+	processed_url = append(processed_url, ' ');
+	int i = url_http_length;
+	
+	//adding hostname
+	while(url[i] != ':' && url[i] != '/' && url[i] != '\0'){
+		processed_url = append(processed_url, url[i]);
+		i++;
+	}
+	
+	processed_url = append(processed_url, ' ');
+	
+	//adding port #
+	if(url[i] == ':'){
+		i++;
+		while(url[i] != '/' && url[i] != '\0'){
+			processed_url = append(processed_url, url[i]);
+			i++;
+		}
+	}else{
+		processed_url = strcat(processed_url, "80");
+	}
+	
+	processed_url = append(processed_url, ' ');
+	
+	//adding filename
+	if(url[i] == '\0'){
+		processed_url = append(processed_url, '/');
+		i++;
+	}
+	else{
+		while(url[i] != '\0'){
+				processed_url = append(processed_url, url[i]);
+				i++;
+			}
+	}
+	
+	if(valid)
+		return processed_url;
+	else
+		return "invalid";
 }
 
 int main(int argc, char *argv[]){
@@ -17,7 +75,7 @@ int main(int argc, char *argv[]){
 	bool print_details = false;		//-d is present, print the details
 	bool print_request = false;		//-r is present, so the program will print the get request
 	bool print_response = false;	//-R is present, so the program will print the response it gets
-	bool save_contents = false;		//-o is present, so the progrm will save the contents at the url to a file 
+	bool save_contents = false;		//-o is present, so the program will save the contents at the url to a file 
 	
 	//Strings for output file location and url
 	char *url = "";
@@ -31,7 +89,9 @@ int main(int argc, char *argv[]){
 					url_present = true; 
 					i++;
 					url = argv[i];
-					//have a urlValid() method here or something
+					url = processURL(url);
+					if(strcmp(url, "invalid") == 0)
+						valid = false;
 					break;
 				case 'd':
 					print_details = true;
@@ -54,6 +114,15 @@ int main(int argc, char *argv[]){
 		}else{
 			valid = false;
 		}
+		
+		printf("%d\n", valid);
+		printf("%d %s\n", url_present, url);
+		printf("%d\n", print_details);
+		printf("%d\n", print_request);
+		printf("%d\n", print_response);
+		printf("%d %s\n", save_contents, contents_file);
+	}
+	if(valid){
 	}
 	
 	
