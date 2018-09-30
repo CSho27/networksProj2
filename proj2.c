@@ -4,8 +4,25 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <netinet/tcp.h>
 
-#define MAX_LINE 80
+#define ERROR 1
+#define HOST_POS 1
+#define PORT_POS 2
+#define FILENAME_POS 3
+#define PROTOCOL "tcp"
+#define BUFLEN 1024
+
+int errexit (char *format, char *arg){
+    fprintf (stderr,format,arg);
+    fprintf (stderr,"\n");
+    exit (ERROR);
+}
 
 //helps me add a character to a string because working with strings in C kinda sucks a little bit
 char *append(char *str1, char character){
@@ -69,6 +86,39 @@ char *processURL(char *url){
 		return "invalid";
 }
 
+int getPortFromString(char *port_string){
+	int port = 0;
+	int place = 1;
+	for(int i=strlen(port_string)-1; i>-1; i--){
+		port += place*(((int) port_string[i])-48);
+		place = place*10;
+	}
+	return port;
+}
+
+int socketSetup(char *host, in_port_t port){
+	struct hostent *hinfo;
+	struct sockaddr_in addr;
+	int on = 1;
+	int sock;     
+
+	if((hinfo = gethostbyname(host)) == NULL){
+		//perror("gethostbyname");
+		exit(1);
+	}
+	bcopy(hinfo->h_addr, &addr.sin_addr, hinfo->h_length);
+	addr.sin_port = htons(port);
+	addr.sin_family = AF_INET;
+	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&on, sizeof(int));
+
+	if(sock == -1){
+		//errexit("setsockopt");
+		exit(1);
+    }
+	return sock;
+}
+
 void printDetails(char *processed_url, char *output_filename){
 	char *token = strtok(processed_url, " ");
 	char *labels[4] = {"hostname", "port", "web_filename"};
@@ -85,6 +135,12 @@ void printDetails(char *processed_url, char *output_filename){
 	fflush(stdout);
 }
 
+void printRequest(char *args[]){
+    printf("REQ: GET %s HTTP/1.0\r\nREQ: Host: %s\r\nREQ: User-Agent: CWRU EECS 325 Client 1.0\r\n",
+            args[3], args[1]);
+    fflush(stdout);
+}
+
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
 	bool valid = true; 				//No invalid args, includes URL, etc.
@@ -95,8 +151,14 @@ int main(int argc, char *argv[]){
 	bool save_contents = false;		//-o is present, so the program will save the contents at the url to a file 
 	
 	//Strings for output file location and url
+	char *url_array[8];
 	char *url = "";
-	char *output_filename = "";
+	char *host;
+	char *url_filename = "";
+	char *output_filename = "none";
+	
+	int port = 0;
+
 	
 	//check for flags/invalid arguments
 	for(int i=1; argv[i] != NULL; i++){
@@ -141,9 +203,43 @@ int main(int argc, char *argv[]){
 	
 	
 	if(valid){
-		if(print_details){
+		if(print_details)
 			printDetails(url, output_filename);
+		url_array[0] = strtok(url, " ");
+		char *token;
+        int i = 0;
+        while (token != NULL){
+               token = strtok(NULL, " ");
+               url_array[++i] = token;
 		}
+		host = url_array[HOST_POS];
+		port = getPortFromString(url_array[PORT_POS]);
+        url_filename = url_array[FILENAME_POS];
+		//printf("host:%s port:%d\n", host, port);
+		fflush(stdout);
+		
+		int sd = socketSetup(host, port);
+        printf("%d", sd);
+        int ret;
+		char buffer [BUFLEN];
+        char request[100];
+        sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
+        if(print_request)
+            printRequest(url_array);
+		write(sd, request, strlen(request));
+        bzero(buffer, BUFLEN);
+        
+        memset (buffer,0x0,BUFLEN);
+        ret = read (sd,buffer,BUFLEN - 1);
+        if (ret < 0)
+            errexit ("reading error",NULL);
+        fprintf (stdout,"%s\n",buffer);
+		
+        shutdown(sd, SHUT_RDWR); 
+        close(sd);
+        
+        
+		
 	}
 	
 	
