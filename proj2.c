@@ -12,11 +12,12 @@
 #include <netinet/tcp.h>
 
 #define ERROR 1
+#define REQUIRED_ARGC 3
 #define HOST_POS 1
 #define PORT_POS 2
 #define FILENAME_POS 3
 #define PROTOCOL "tcp"
-#define BUFLEN 10024
+#define BUFLEN 1024
 
 int errexit (char *format, char *arg){
     fprintf (stderr,format,arg);
@@ -34,15 +35,16 @@ char *append(char *str1, char character){
 //This checks the validity of the url and breaks the arguments into a form that strtok can easily make an array
 char *processURL(char *url){
 	char *processed_url = malloc(100);
-	bool valid = true;
 	const int url_http_length = 7;
-	
+    
 	//checking for correct "http://"
-	for(int i=0; i<7; i++){
-		processed_url = append(processed_url, url[i]);
-	}
-	if(strncasecmp(processed_url, "http://", url_http_length) != 0)
-		valid = false;
+    if(url != NULL || strncasecmp(url, "http://", url_http_length) != 0){
+        return "invalid";
+    }
+    else{
+        processed_url = "http://";
+    }
+    
 	
 	processed_url = append(processed_url, ' ');
 	int i = url_http_length;
@@ -79,11 +81,9 @@ char *processURL(char *url){
 				i++;
 			}
 	}
-	
-	if(valid)
-		return processed_url;
-	else
-		return "invalid";
+	printf("%s", processed_url);
+    fflush(stdout);
+    return processed_url;
 }
 
 int getPortFromString(char *port_string){
@@ -94,29 +94,6 @@ int getPortFromString(char *port_string){
 		place = place*10;
 	}
 	return port;
-}
-
-int socketSetup(char *host, in_port_t port){
-	struct hostent *hinfo;
-	struct sockaddr_in addr;
-	int on = 1;
-	int sock;     
-
-	if((hinfo = gethostbyname(host)) == NULL){
-		printf("Error: gethostbyname");
-		exit(1);
-	}
-	bcopy(hinfo->h_addr, &addr.sin_addr, hinfo->h_length);
-	addr.sin_port = htons(port);
-	addr.sin_family = AF_INET;
-	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&on, sizeof(int));
-
-	if(sock == -1){
-		//errexit("setsockopt");
-		exit(1);
-    }
-	return sock;
 }
 
 void printDetails(char *url_array[], char *output_filename){
@@ -214,31 +191,53 @@ int main(int argc, char *argv[]){
 		port = getPortFromString(url_array[PORT_POS]);
         url_filename = url_array[FILENAME_POS];
 		
-		int sd = socketSetup(host, port);
-        printf("socket: %d\n", sd);
-        int ret = -1;
-		char buffer [BUFLEN];
+		struct sockaddr_in sin;
+        struct hostent *hinfo;
+        struct protoent *protoinfo;
+        char buffer [BUFLEN];
+        int sd, ret;
+
+        /* lookup the hostname */
+        hinfo = gethostbyname (host);
+        if (hinfo == NULL)
+            errexit ("cannot find name: %s", host);
+
+        /* set endpoint information */
+        memset ((char *)&sin, 0x0, sizeof (sin));
+        sin.sin_family = AF_INET;
+        sin.sin_port = htons (port);
+        memcpy ((char *)&sin.sin_addr,hinfo->h_addr,hinfo->h_length);
+
+        if ((protoinfo = getprotobyname (PROTOCOL)) == NULL)
+            errexit ("cannot find protocol information for %s", PROTOCOL);
+
+        /* allocate a socket */
+        /*   would be SOCK_DGRAM for UDP */
+        sd = socket(PF_INET, SOCK_STREAM, protoinfo->p_proto);
+        if (sd < 0)
+            errexit("cannot create socket",NULL);
+
+        /* connect the socket */
+        if (connect (sd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+            errexit ("cannot connect", NULL);
+
         char request[100];
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
-        if(print_request)
-            printRequest(url_array);
-        printf("return:%d\n", ret);
-        fflush(stdout);
-		write(sd, request, strlen(request));
+        //request some shit
+        sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
+        write(sd, request, strlen(request));
         bzero(buffer, BUFLEN);
-        
+
+        /* snarf whatever server provides and print it */
         memset (buffer,0x0,BUFLEN);
         ret = read (sd,buffer,BUFLEN - 1);
-        printf("return:%d\n", ret);
-        fflush(stdout);
         if (ret < 0)
-            printf("reading error");
+            errexit ("reading error",NULL);
         fprintf (stdout,"%s\n",buffer);
-        fflush(stdout);
-		
-        shutdown(sd, SHUT_RDWR); 
-        close(sd);
-        
+
+        /* close & exit */
+        close (sd);
+        exit (0);
         
 		
 	}
