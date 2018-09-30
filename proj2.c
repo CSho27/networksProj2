@@ -79,7 +79,7 @@ char *processURL(char *url){
 	//adding filename
 	if(url[url_index] == '\0'){
 			processed_url[purl_index] = '/';
-        purl_index++;
+            purl_index++;
 	}
 	else{
 		while(url[url_index] != '\0'){
@@ -129,6 +129,19 @@ void printResponse(char *response){
                 printf("\nRSP: ");
                 fflush(stdout);
             }
+            line++;
+        }
+        else{
+            printf("%c", response[i]);
+            fflush(stdout);
+        }
+    }
+}
+
+void printToFile(char *response){
+    int line = 0;
+    for(int i=0; i<strlen(response); i++){
+        if(response[i]=='\n' && line<8){
             line++;
         }
         else{
@@ -191,7 +204,6 @@ int main(int argc, char *argv[]){
                
 		}
 	}
-    printf("%d %s\n", save_contents, output_filename);
 	
     if(valid){
         char *token = strtok(url, " ");
@@ -258,7 +270,9 @@ int main(int argc, char *argv[]){
             printRequest(url_array);
         if(print_response)
             printResponse(response);
-
+        if(save_contents)
+            printToFile(response);
+    
         /* close & exit */
         close (sd);
         exit (0);
