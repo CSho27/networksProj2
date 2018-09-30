@@ -25,65 +25,73 @@ int errexit (char *format, char *arg){
     exit (ERROR);
 }
 
-//helps me add a character to a string because working with strings in C kinda sucks a little bit
-char *append(char *str1, char character){
-	char *new_string = malloc(100);
-	sprintf(new_string, "%s%c", str1, character);
-	return new_string;
-}
-
 //This checks the validity of the url and breaks the arguments into a form that strtok can easily make an array
 char *processURL(char *url){
-	char *processed_url = malloc(100);
-	const int url_http_length = 7;
+	char processed_url[strlen(url)*2];
+	const char *http_start = "http://"; 
+    int url_index = 0;
+    int purl_index = 0;
     
 	//checking for correct "http://"
-    if(url != NULL || strncasecmp(url, "http://", url_http_length) != 0){
+    if(url == NULL || strncasecmp(url, http_start, strlen(http_start)) != 0){
         return "invalid";
     }
-    else{
-        processed_url = "http://";
-    }
+    else
+        for(int i=0; i<strlen(http_start); i++){
+            processed_url[purl_index] = http_start[i];
+            purl_index++;
+        }
     
-	
-	processed_url = append(processed_url, ' ');
-	int i = url_http_length;
+    url_index = strlen(http_start);
+	processed_url[purl_index] = ' ';
+    purl_index++;
 	
 	//adding hostname
-	while(url[i] != ':' && url[i] != '/' && url[i] != '\0'){
-		processed_url = append(processed_url, url[i]);
-		i++;
+	while(url[url_index] != ':' && url[url_index] != '/' && url[url_index] != '\0'){
+		processed_url[purl_index] = url[url_index];
+        url_index++;
+		purl_index++;
 	}
 	
-	processed_url = append(processed_url, ' ');
+	processed_url[purl_index] = ' ';
+    purl_index++;
 	
 	//adding port #
-	if(url[i] == ':'){
-		i++;
-		while(url[i] != '/' && url[i] != '\0'){
-			processed_url = append(processed_url, url[i]);
-			i++;
+	if(url[url_index] == ':'){
+		url_index++;
+		while(url[url_index] != '/' && url[url_index] != '\0'){
+			processed_url[purl_index] = url[url_index];
+            url_index++;
+            purl_index++;
 		}
 	}else{
-		processed_url = strcat(processed_url, "80");
+		for(int i=0; i<strlen("80"); i++){
+            processed_url[purl_index] = "80"[i];
+            purl_index++;
+        }
 	}
 	
-	processed_url = append(processed_url, ' ');
+	processed_url[purl_index] = ' ';
+    purl_index++;
 	
 	//adding filename
-	if(url[i] == '\0'){
-		processed_url = append(processed_url, '/');
-		i++;
+	if(url[url_index] == '\0'){
+			processed_url[purl_index] = '/';
+        purl_index++;
 	}
 	else{
-		while(url[i] != '\0'){
-				processed_url = append(processed_url, url[i]);
-				i++;
+		while(url[url_index] != '\0'){
+				processed_url[purl_index] = url[url_index];
+                url_index++;
+                purl_index++;
 			}
 	}
-	printf("%s", processed_url);
+    processed_url[purl_index] = '\0';
+	printf("PROCESSED: %s\n", processed_url);
     fflush(stdout);
-    return processed_url;
+    char *url_return = malloc(strlen(processed_url));
+    strcpy(url_return, processed_url);
+    return url_return;
 }
 
 int getPortFromString(char *port_string){
@@ -122,7 +130,7 @@ int main(int argc, char *argv[]){
 	bool save_contents = false;		//-o is present, so the program will save the contents at the url to a file 
 	
 	//Strings for output file location and url
-	char *url_array[8];
+	char *url_array[8];// = {"http://", "www.clevelandparkingtickets.com", "80", "/"};
 	char *url = "";
 	char *host;
 	char *url_filename = "";
@@ -167,12 +175,12 @@ int main(int argc, char *argv[]){
                
 		}
 	}
-	printf("%d\n", valid);
-		printf("%d %s\n", url_present, url);
-		printf("%d\n", print_details);
-		printf("%d\n", print_request);
-		printf("%d\n", print_response);
-		printf("%d %s\n", save_contents, output_filename);
+    printf("%d\n", valid);
+    printf("%d %s\n", url_present, url);
+    printf("%d\n", print_details);
+    printf("%d\n", print_request);
+    printf("%d\n", print_response);
+    printf("%d %s\n", save_contents, output_filename);
 	
 	
 	if(valid){
@@ -183,6 +191,7 @@ int main(int argc, char *argv[]){
            token = strtok(NULL, " ");
            i++;
 		}
+        
         
 		if(print_details)
 			printDetails(url_array, output_filename);
@@ -245,4 +254,5 @@ int main(int argc, char *argv[]){
 	
 
 	return 0;
+
 }
