@@ -17,7 +17,8 @@
 #define PORT_POS 2
 #define FILENAME_POS 3
 #define PROTOCOL "tcp"
-#define BUFLEN 1024
+#define BUFLEN 2048
+#define RSP_LEN 7
 
 int errexit (char *format, char *arg){
     fprintf (stderr,format,arg);
@@ -36,11 +37,12 @@ char *processURL(char *url){
     if(url == NULL || strncasecmp(url, http_start, strlen(http_start)) != 0){
         return "invalid";
     }
-    else
+    else{
         for(int i=0; i<strlen(http_start); i++){
             processed_url[purl_index] = http_start[i];
             purl_index++;
         }
+    }
     
     url_index = strlen(http_start);
 	processed_url[purl_index] = ' ';
@@ -87,8 +89,6 @@ char *processURL(char *url){
 			}
 	}
     processed_url[purl_index] = '\0';
-	printf("PROCESSED: %s\n", processed_url);
-    fflush(stdout);
     char *url_return = malloc(strlen(processed_url));
     strcpy(url_return, processed_url);
     return url_return;
@@ -115,15 +115,32 @@ void printDetails(char *url_array[], char *output_filename){
 }
 
 void printRequest(char *args[]){
-    printf("REQ: GET %s HTTP/1.0\r\nREQ: Host: %s\r\nREQ: User-Agent: CWRU EECS 325 Client 1.0\r\n",
-            args[3], args[1]);
+    printf("REQ: GET %s HTTP/1.0\r\nREQ: Host: %s\r\nREQ: User-Agent: CWRU EECS 325 Client 1.0\r\n", args[FILENAME_POS], args[HOST_POS]);
     fflush(stdout);
+}
+
+void printResponse(char *response){
+    printf("RSP: ");
+    fflush(stdout);
+    int line = 0;
+    for(int i=0; line<RSP_LEN; i++){
+        if(response[i]=='\n'){
+            if(line<6){
+                printf("\nRSP: ");
+                fflush(stdout);
+            }
+            line++;
+        }
+        else{
+            printf("%c", response[i]);
+            fflush(stdout);
+        }
+    }
 }
 
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
 	bool valid = true; 				//No invalid args, includes URL, etc.
-	bool url_present = false; 		//-u flag is there and a valid url follows it
 	bool print_details = false;		//-d is present, print the details
 	bool print_request = false;		//-r is present, so the program will print the get request
 	bool print_response = false;	//-R is present, so the program will print the response it gets
@@ -143,8 +160,7 @@ int main(int argc, char *argv[]){
 	for(int i=1; argv[i] != NULL; i++){
 		if(argv[i][0] == '-'){
 			switch(argv[i][1]){
-				case 'u':
-					url_present = true; 
+                case 'u':
 					i++;
 					url = argv[i];
 					url = processURL(url);
@@ -175,15 +191,9 @@ int main(int argc, char *argv[]){
                
 		}
 	}
-    printf("%d\n", valid);
-    printf("%d %s\n", url_present, url);
-    printf("%d\n", print_details);
-    printf("%d\n", print_request);
-    printf("%d\n", print_response);
     printf("%d %s\n", save_contents, output_filename);
 	
-	
-	if(valid){
+    if(valid){
         char *token = strtok(url, " ");
         int i = 0;
         while (token != NULL){
@@ -242,7 +252,12 @@ int main(int argc, char *argv[]){
         ret = read (sd,buffer,BUFLEN - 1);
         if (ret < 0)
             errexit ("reading error",NULL);
-        fprintf (stdout,"%s\n",buffer);
+        char *response = malloc(strlen(buffer));
+        sprintf(response,"%s\n",buffer);
+        if(print_request)
+            printRequest(url_array);
+        if(print_response)
+            printResponse(response);
 
         /* close & exit */
         close (sd);
