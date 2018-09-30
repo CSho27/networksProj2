@@ -122,34 +122,36 @@ void printRequest(char *args[]){
 void printResponse(char *response){
     printf("RSP: ");
     fflush(stdout);
-    int line = 0;
-    for(int i=0; line<RSP_LEN; i++){
+    char *end;
+    end = strstr(response, "\r\n\r\n");
+    int end_index = (end ? end-response : -1);
+    for(int i=0; i<end_index; i++){
         if(response[i]=='\n'){
-            if(line<6){
-                printf("\nRSP: ");
-                fflush(stdout);
-            }
-            line++;
+            printf("\nRSP: ");
+            fflush(stdout);
         }
         else{
             printf("%c", response[i]);
             fflush(stdout);
         }
     }
+    printf("%c", response[end_index]);
 }
 
-void printToFile(char *response){
-    int line = 0;
-    for(int i=0; i<strlen(response); i++){
-        if(response[i]=='\n' && line<8){
-            line++;
-        }
-        else{
-            printf("%c", response[i]);
-            fflush(stdout);
-        }
+void printToFile(char *filename, char *response){
+    FILE *f = fopen(filename, "w");
+    if (f == NULL){
+        printf("Error opening file!\n");
+        exit(1);
     }
-}
+    char *start;
+    start = strstr(response, "\r\n\r\n");
+    int start_index = (start ? start-response : -1)+4;
+    for(int i=start_index; i<strlen(response); i++){
+        fprintf(f, "%c", response[i]);
+    }
+    fclose(f);
+}            
 
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
@@ -200,7 +202,7 @@ int main(int argc, char *argv[]){
 			}
 		}else{
 			valid = false;
-            printf("Error: no URL included");
+            printf("Error: enter -u followed by a URL to make an HTTP request to that webpage\n");
                
 		}
 	}
@@ -254,7 +256,7 @@ int main(int argc, char *argv[]){
 
         char request[100];
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
-        //request some shit
+        //request some stuff
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
         write(sd, request, strlen(request));
         bzero(buffer, BUFLEN);
@@ -264,20 +266,17 @@ int main(int argc, char *argv[]){
         ret = read (sd,buffer,BUFLEN - 1);
         if (ret < 0)
             errexit ("reading error",NULL);
-        char *response = malloc(strlen(buffer));
-        sprintf(response,"%s\n",buffer);
+        buffer[ret+1] = '\0';
         if(print_request)
             printRequest(url_array);
         if(print_response)
-            printResponse(response);
-        if(save_contents)
-            printToFile(response);
+            printResponse(buffer);
+        if(save_contents && strstr(buffer, "200")!=NULL)
+            printToFile(output_filename, buffer);
     
         /* close & exit */
         close (sd);
         exit (0);
-        
-		
 	}
 	
 	
