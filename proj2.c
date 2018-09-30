@@ -16,7 +16,7 @@
 #define PORT_POS 2
 #define FILENAME_POS 3
 #define PROTOCOL "tcp"
-#define BUFLEN 1024
+#define BUFLEN 10024
 
 int errexit (char *format, char *arg){
     fprintf (stderr,format,arg);
@@ -103,7 +103,7 @@ int socketSetup(char *host, in_port_t port){
 	int sock;     
 
 	if((hinfo = gethostbyname(host)) == NULL){
-		//perror("gethostbyname");
+		printf("Error: gethostbyname");
 		exit(1);
 	}
 	bcopy(hinfo->h_addr, &addr.sin_addr, hinfo->h_length);
@@ -119,19 +119,13 @@ int socketSetup(char *host, in_port_t port){
 	return sock;
 }
 
-void printDetails(char *processed_url, char *output_filename){
-	char *token = strtok(processed_url, " ");
+void printDetails(char *url_array[], char *output_filename){
 	char *labels[4] = {"hostname", "port", "web_filename"};
-	int i=0;
-	token = strtok(NULL, " ");
-	
-	while(token != NULL){
-		printf("DET: %s = %s\n", labels[i], token);
+	for(int i=0; i<3; i++){
+		printf("DET: %s = %s\n", labels[i], url_array[i+1]);
 		fflush(stdout);
-		token = strtok(NULL, " ");
-		i++;
-	}
-	printf("DET: output_filename = %s\n", output_filename);
+    }
+    printf("DET: output_filename = %s\n", output_filename);
 	fflush(stdout);
 }
 
@@ -192,6 +186,8 @@ int main(int argc, char *argv[]){
 			}
 		}else{
 			valid = false;
+            printf("Error: no URL included");
+               
 		}
 	}
 	printf("%d\n", valid);
@@ -203,37 +199,42 @@ int main(int argc, char *argv[]){
 	
 	
 	if(valid){
-		if(print_details)
-			printDetails(url, output_filename);
-		url_array[0] = strtok(url, " ");
-		char *token;
+        char *token = strtok(url, " ");
         int i = 0;
         while (token != NULL){
-               token = strtok(NULL, " ");
-               url_array[++i] = token;
+           url_array[i] = token;
+           token = strtok(NULL, " ");
+           i++;
 		}
+        
+		if(print_details)
+			printDetails(url_array, output_filename);
+	
 		host = url_array[HOST_POS];
 		port = getPortFromString(url_array[PORT_POS]);
         url_filename = url_array[FILENAME_POS];
-		//printf("host:%s port:%d\n", host, port);
-		fflush(stdout);
 		
 		int sd = socketSetup(host, port);
-        printf("%d", sd);
-        int ret;
+        printf("socket: %d\n", sd);
+        int ret = -1;
 		char buffer [BUFLEN];
         char request[100];
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
         if(print_request)
             printRequest(url_array);
+        printf("return:%d\n", ret);
+        fflush(stdout);
 		write(sd, request, strlen(request));
         bzero(buffer, BUFLEN);
         
         memset (buffer,0x0,BUFLEN);
         ret = read (sd,buffer,BUFLEN - 1);
+        printf("return:%d\n", ret);
+        fflush(stdout);
         if (ret < 0)
-            errexit ("reading error",NULL);
+            printf("reading error");
         fprintf (stdout,"%s\n",buffer);
+        fflush(stdout);
 		
         shutdown(sd, SHUT_RDWR); 
         close(sd);
