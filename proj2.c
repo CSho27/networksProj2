@@ -1,5 +1,8 @@
 //Chris Shorter
-//This contains the main method for project 2
+//cws68
+//proj2.c
+//9-29-18
+//This contains all methods for project 2, which makes HTTP GET requests, prints responses, and writes contents to files
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -21,20 +24,23 @@
 #define RSP_LEN 7
 
 int errexit (char *format, char *arg){
-    fprintf (stderr,format,arg);
-    fprintf (stderr,"\n");
+    fprintf (stdout,format,arg);
+    fprintf (stdout,"\n");
     exit (ERROR);
 }
 
 //This checks the validity of the url and breaks the arguments into a form that strtok can easily make an array
 char *processURL(char *url){
+    if(url == NULL)
+            return "empty";
+    
 	char processed_url[strlen(url)*2];
 	const char *http_start = "http://"; 
     int url_index = 0;
     int purl_index = 0;
     
 	//checking for correct "http://"
-    if(url == NULL || strncasecmp(url, http_start, strlen(http_start)) != 0){
+    if(strncasecmp(url, http_start, strlen(http_start)) != 0){
         return "invalid";
     }
     else{
@@ -88,6 +94,7 @@ char *processURL(char *url){
                 purl_index++;
 			}
 	}
+    
     processed_url[purl_index] = '\0';
     char *url_return = malloc(strlen(processed_url));
     strcpy(url_return, processed_url);
@@ -104,6 +111,7 @@ int getPortFromString(char *port_string){
 	return port;
 }
 
+//Prints the details provided by the user that will be used in the GET
 void printDetails(char *url_array[], char *output_filename){
 	char *labels[4] = {"hostname", "port", "web_filename"};
 	for(int i=0; i<3; i++){
@@ -114,11 +122,13 @@ void printDetails(char *url_array[], char *output_filename){
 	fflush(stdout);
 }
 
+//Prints the request just as it is written to the socket
 void printRequest(char *args[]){
     printf("REQ: GET %s HTTP/1.0\r\nREQ: Host: %s\r\nREQ: User-Agent: CWRU EECS 325 Client 1.0\r\n", args[FILENAME_POS], args[HOST_POS]);
     fflush(stdout);
 }
 
+//Prints the HTTP response just as it was received from the socket
 void printResponse(char *response){
     printf("RSP: ");
     fflush(stdout);
@@ -138,11 +148,11 @@ void printResponse(char *response){
     printf("%c", response[end_index]);
 }
 
-void printToFile(char *filename, char *response){
+//Writes the the HTML contents of the webpage to a file
+bool printToFile(char *filename, char *response){
     FILE *f = fopen(filename, "w");
     if (f == NULL){
-        printf("Error opening file!\n");
-        exit(1);
+        return false;
     }
     char *start;
     start = strstr(response, "\r\n\r\n");
@@ -151,11 +161,12 @@ void printToFile(char *filename, char *response){
         fprintf(f, "%c", response[i]);
     }
     fclose(f);
+    return true;
 }            
 
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
-	bool valid = true; 				//No invalid args, includes URL, etc.
+    bool url_present = false;        //-u is present, so the command is valid
 	bool print_details = false;		//-d is present, print the details
 	bool print_request = false;		//-r is present, so the program will print the get request
 	bool print_response = false;	//-R is present, so the program will print the response it gets
@@ -179,8 +190,15 @@ int main(int argc, char *argv[]){
 					i++;
 					url = argv[i];
 					url = processURL(url);
-					if(strcmp(url, "invalid") == 0)
-						valid = false;
+					if(strcmp(url, "invalid") == 0){
+						errexit("ERROR: URL entered was invalid\n(Only \"http\" URLs are accepted)", NULL);
+                    }
+                    else{
+                        if(strcmp(url, "empty") == 0)
+                            errexit("ERROR: please enter a URL follwing the -u flag", NULL);
+                        else
+                            url_present = true;
+                    }
 					break;
 				case 'd':
 					print_details = true;
@@ -194,20 +212,25 @@ int main(int argc, char *argv[]){
 				case 'o':
 					save_contents = true;
 					i++;
-					output_filename = argv[i];
+                    if(argv[i] == NULL || argv[i][0] == '-')
+                        errexit("ERROR: -o flag must be followed by a filename", NULL);
+                    else
+					    output_filename = argv[i];
 					break;
 				default:
-					valid = false;
+					errexit("ERROR: Invalid flag. Enter -u followed by a URL to make an HTTP request to that webpage", NULL);
 					break;
 			}
-		}else{
-			valid = false;
-            printf("Error: enter -u followed by a URL to make an HTTP request to that webpage\n");
-               
+		}
+        else{
+            errexit("ERROR: Either no flags were entered or an invalid argument was passed.\nValid flags/arguments are: -u <url>, -d, -r, -R, -o <filename>\nEnter -u followed by a URL to make an HTTP request to that webpage", NULL);
 		}
 	}
-	
-    if(valid){
+    
+    if(!url_present){
+        errexit("ERROR: -u flag not included. Enter -u followed by a URL to make an HTTP request to that webpage", NULL);
+    }
+	else{
         char *token = strtok(url, " ");
         int i = 0;
         while (token != NULL){
@@ -233,7 +256,7 @@ int main(int argc, char *argv[]){
         /* lookup the hostname */
         hinfo = gethostbyname (host);
         if (hinfo == NULL)
-            errexit ("cannot find name: %s", host);
+            errexit ("ERROR: cannot find name: %s", host);
 
         /* set endpoint information */
         memset ((char *)&sin, 0x0, sizeof (sin));
@@ -242,18 +265,19 @@ int main(int argc, char *argv[]){
         memcpy ((char *)&sin.sin_addr,hinfo->h_addr,hinfo->h_length);
 
         if ((protoinfo = getprotobyname (PROTOCOL)) == NULL)
-            errexit ("cannot find protocol information for %s", PROTOCOL);
+            errexit ("ERROR: cannot find protocol information for %s", PROTOCOL);
 
         /* allocate a socket */
         /*   would be SOCK_DGRAM for UDP */
         sd = socket(PF_INET, SOCK_STREAM, protoinfo->p_proto);
         if (sd < 0)
-            errexit("cannot create socket",NULL);
+            errexit("ERROR: cannot create socket",NULL);
 
         /* connect the socket */
         if (connect (sd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
-            errexit ("cannot connect", NULL);
-
+            errexit ("ERROR: cannot connect", NULL);
+        
+        //compose and make request
         char request[100];
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
         //request some stuff
@@ -265,14 +289,23 @@ int main(int argc, char *argv[]){
         memset (buffer,0x0,BUFLEN);
         ret = read (sd,buffer,BUFLEN - 1);
         if (ret < 0)
-            errexit ("reading error",NULL);
+            errexit ("ERROR: reading error",NULL);
         buffer[ret+1] = '\0';
+        
+        //Finish operating upon flags
         if(print_request)
             printRequest(url_array);
         if(print_response)
             printResponse(buffer);
-        if(save_contents && strstr(buffer, "200")!=NULL)
-            printToFile(output_filename, buffer);
+        if(save_contents){
+            if(strstr(buffer, "200")==NULL){
+                errexit("ERROR: Could not find content at URL and will not write to file.", NULL);
+            }
+            else{
+                if(!printToFile(output_filename, buffer))
+                errexit("ERROR: Error opening or writing to file", NULL);
+            }
+        }
     
         /* close & exit */
         close (sd);
