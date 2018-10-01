@@ -22,7 +22,14 @@
 #define PROTOCOL "tcp"
 #define BUFLEN 2048
 #define RSP_LEN 7
+#define URL_ARGS_LEN 5
+#define HTTP_START "http://"
+#define LABELS_LEN 3
+#define EMPTY_LINE "\r\n\r\n"
+#define END_STRING '\0'
+#define DEFAULT_PORT_STR "80"
 
+//If there's any sort of error the program exits immediately.
 int errexit (char *format, char *arg){
     fprintf (stdout,format,arg);
     fprintf (stdout,"\n");
@@ -34,28 +41,29 @@ char *processURL(char *url){
     if(url == NULL)
             return "empty";
     
+    //create an array of double URL length just make sure this array is always longer than the URL, even for very short URLs
+    //This uses two indexes to build a string with separated url arguments fro the given URL
 	char processed_url[strlen(url)*2];
-	const char *http_start = "http://"; 
     int url_index = 0;
     int purl_index = 0;
     
-	//checking for correct "http://"
-    if(strncasecmp(url, http_start, strlen(http_start)) != 0){
+	//checking for correct "http://" at beginning, if so add http:// to the processed URL string"
+    if(strncasecmp(url, HTTP_START, strlen(HTTP_START)) != 0){
         return "invalid";
     }
     else{
-        for(int i=0; i<strlen(http_start); i++){
-            processed_url[purl_index] = http_start[i];
+        for(int i=0; i<strlen(HTTP_START); i++){
+            processed_url[purl_index] = HTTP_START[i];
             purl_index++;
         }
     }
     
-    url_index = strlen(http_start);
+    url_index = strlen(HTTP_START);
 	processed_url[purl_index] = ' ';
     purl_index++;
 	
-	//adding hostname
-	while(url[url_index] != ':' && url[url_index] != '/' && url[url_index] != '\0'){
+	//adding hostname from URL to processed URL string
+	while(url[url_index] != ':' && url[url_index] != '/' && url[url_index] != END_STRING){
 		processed_url[purl_index] = url[url_index];
         url_index++;
 		purl_index++;
@@ -64,17 +72,17 @@ char *processURL(char *url){
 	processed_url[purl_index] = ' ';
     purl_index++;
 	
-	//adding port #
+	//adding port # to processed URL string
 	if(url[url_index] == ':'){
 		url_index++;
-		while(url[url_index] != '/' && url[url_index] != '\0'){
+		while(url[url_index] != '/' && url[url_index] != END_STRING){
 			processed_url[purl_index] = url[url_index];
             url_index++;
             purl_index++;
 		}
 	}else{
-		for(int i=0; i<strlen("80"); i++){
-            processed_url[purl_index] = "80"[i];
+		for(int i=0; i<strlen(DEFAULT_PORT_STR); i++){
+            processed_url[purl_index] = DEFAULT_PORT_STR[i];
             purl_index++;
         }
 	}
@@ -82,25 +90,29 @@ char *processURL(char *url){
 	processed_url[purl_index] = ' ';
     purl_index++;
 	
-	//adding filename
-	if(url[url_index] == '\0'){
+	//adding filename to processed URL string
+	if(url[url_index] == END_STRING){
 			processed_url[purl_index] = '/';
             purl_index++;
 	}
 	else{
-		while(url[url_index] != '\0'){
+        //Everything else here until end of string character is part of filename
+		while(url[url_index] != END_STRING){
 				processed_url[purl_index] = url[url_index];
                 url_index++;
                 purl_index++;
 			}
 	}
     
-    processed_url[purl_index] = '\0';
+    //Creating a string literal that can be returned
+    processed_url[purl_index] = END_STRING;
     char *url_return = malloc(strlen(processed_url));
     strcpy(url_return, processed_url);
     return url_return;
 }
 
+//Just takes a string and turns it into an integer.
+//Realized later a method already exists for this but I enjoyed the challenge.
 int getPortFromString(char *port_string){
 	int port = 0;
 	int place = 1;
@@ -113,9 +125,9 @@ int getPortFromString(char *port_string){
 
 //Prints the details provided by the user that will be used in the GET
 void printDetails(char *url_array[], char *output_filename){
-	char *labels[4] = {"hostname", "port", "web_filename"};
-	for(int i=0; i<3; i++){
-		printf("DET: %s = %s\n", labels[i], url_array[i+1]);
+	const char *LABELS[3] = {"hostname", "port", "web_filename"};
+	for(int i=0; i<LABELS_LEN; i++){
+		printf("DET: %s = %s\n", LABELS[i], url_array[i+1]);
 		fflush(stdout);
     }
     printf("DET: output_filename = %s\n", output_filename);
@@ -133,8 +145,8 @@ void printResponse(char *response){
     printf("RSP: ");
     fflush(stdout);
     char *end;
-    end = strstr(response, "\r\n\r\n");
-    int end_index = (end ? end-response : -1);
+    end = strstr(response, EMPTY_LINE);
+    int end_index = (end ? end-response : -1)+1;
     for(int i=0; i<end_index; i++){
         if(response[i]=='\n'){
             printf("\nRSP: ");
@@ -148,15 +160,19 @@ void printResponse(char *response){
     printf("%c", response[end_index]);
 }
 
-//Writes the the HTML contents of the webpage to a file
-bool printToFile(char *filename, char *response){
+//Writes the the HTML contents of the webpage to a file. Does so by appending an existing file.
+bool printToFile(char *filename, char *response, bool header_present){
     FILE *f = fopen(filename, "a");
     if (f == NULL){
         return false;
     }
-    char *start;
-    start = strstr(response, "\r\n\r\n");
-    int start_index = (start ? start-response : -1)+4;
+    
+    int start_index = 0;
+    if(header_present){
+        char *start = strstr(response, EMPTY_LINE);
+        start_index = (start ? start-response : -1)+strlen(EMPTY_LINE);
+    }
+    
     for(int i=start_index; i<strlen(response); i++){
         fprintf(f, "%c", response[i]);
     }
@@ -164,6 +180,7 @@ bool printToFile(char *filename, char *response){
     return true;
 } 
 
+//Creates or overwrites the file at the location given by the user to be clear to start appending new content
 bool createAndClearFile(char *filename){
     FILE *f = fopen(filename, "w");
     if(f == NULL){
@@ -175,7 +192,7 @@ bool createAndClearFile(char *filename){
     }
 }
     
-
+//This main method processes flags and makes the actual socket connection and HTTP request
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
     bool url_present = false;        //-u is present, so the command is valid
@@ -185,7 +202,7 @@ int main(int argc, char *argv[]){
 	bool save_contents = false;		//-o is present, so the program will save the contents at the url to a file 
 	
 	//Strings for output file location and url
-	char *url_array[8];// = {"http://", "www.clevelandparkingtickets.com", "80", "/"};
+	char *url_array[URL_ARGS_LEN];
 	char *url = "";
 	char *host;
 	char *url_filename = "";
@@ -290,8 +307,7 @@ int main(int argc, char *argv[]){
             errexit ("ERROR: cannot connect", NULL);
         
         //compose and make request
-        char request[100];
-        sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
+        char request[100+strlen(url_filename)+strlen(host)];
         //request some stuff
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
         //If the user requested to print request do it
@@ -305,26 +321,31 @@ int main(int argc, char *argv[]){
         
         int ret = 1;
         bool handled_header = false;
+        bool ok = false; //gets 200 OK response
+        //Cycle through reading data and printing what the buffer captures until the return value of read is no longer positive
         while(ret>0){
             /* snarf whatever server provides and print it */
             memset (buffer,0x0,BUFLEN);
             ret = read (sd,buffer,BUFLEN - 1);
             if (ret < 0)
                 errexit ("ERROR: reading error",NULL);
-            buffer[ret+1] = '\0';
-        
+            //buffer[ret+1] = END_STRING;
+            
+            //If it's the first time cycling through print the HTTP response header
             if(print_response && !handled_header)
                 printResponse(buffer);
-            if(strstr(buffer, "200")==NULL && !handled_header){
+            //Only print if response code is 200 OK
+            if(strstr(buffer, "200")==NULL && !handled_header && !ok){
                 errexit("ERROR: Could not find content at URL and will not write to file.", NULL);
             }
             else{
-                handled_header = true;
+                ok = true;
             }
-            if(save_contents){
-                if(!printToFile(output_filename, buffer))
+            if(save_contents & ok){
+                if(!printToFile(output_filename, buffer, !handled_header))
                     errexit("ERROR: writing to file", NULL);
             }
+            handled_header = true;
         }
         
         /* close & exit */
