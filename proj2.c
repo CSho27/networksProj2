@@ -150,7 +150,7 @@ void printResponse(char *response){
 
 //Writes the the HTML contents of the webpage to a file
 bool printToFile(char *filename, char *response){
-    FILE *f = fopen(filename, "w");
+    FILE *f = fopen(filename, "a");
     if (f == NULL){
         return false;
     }
@@ -162,7 +162,19 @@ bool printToFile(char *filename, char *response){
     }
     fclose(f);
     return true;
-}            
+} 
+
+bool createAndClearFile(char *filename){
+    FILE *f = fopen(filename, "w");
+    if(f == NULL){
+        return false;
+    }
+    else{
+        fclose(f);
+        return true;
+    }
+}
+    
 
 int main(int argc, char *argv[]){
 	//booleans to record which flags are present
@@ -251,7 +263,7 @@ int main(int argc, char *argv[]){
         struct hostent *hinfo;
         struct protoent *protoinfo;
         char buffer [BUFLEN];
-        int sd, ret;
+        int sd;
 
         /* lookup the hostname */
         hinfo = gethostbyname (host);
@@ -282,34 +294,42 @@ int main(int argc, char *argv[]){
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
         //request some stuff
         sprintf(request, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: CWRU EECS 325 Client 1.0\r\n\r\n", url_filename, host);
-        write(sd, request, strlen(request));
-        bzero(buffer, BUFLEN);
-
-        /* snarf whatever server provides and print it */
-        memset (buffer,0x0,BUFLEN);
-        ret = read (sd,buffer,BUFLEN - 1);
-        if (ret < 0)
-            errexit ("ERROR: reading error",NULL);
-        buffer[ret+1] = '\0';
-        
-        //Finish operating upon flags
+        //If the user requested to print request do it
         if(print_request)
             printRequest(url_array);
-        if(print_response)
-            printResponse(buffer);
-        if(save_contents){
-            if(strstr(buffer, "200")==NULL){
+        write(sd, request, strlen(request));
+        bzero(buffer, BUFLEN);
+        
+        if(!createAndClearFile(output_filename))
+            errexit("ERROR: Error opening file. Check permissions.", NULL);
+        
+        int ret = 1;
+        bool handled_header = false;
+        while(ret>0){
+            /* snarf whatever server provides and print it */
+            memset (buffer,0x0,BUFLEN);
+            ret = read (sd,buffer,BUFLEN - 1);
+            if (ret < 0)
+                errexit ("ERROR: reading error",NULL);
+            buffer[ret+1] = '\0';
+        
+            if(print_response && !handled_header)
+                printResponse(buffer);
+            if(strstr(buffer, "200")==NULL && !handled_header){
                 errexit("ERROR: Could not find content at URL and will not write to file.", NULL);
             }
             else{
+                handled_header = true;
+            }
+            if(save_contents){
                 if(!printToFile(output_filename, buffer))
-                errexit("ERROR: Error opening or writing to file", NULL);
+                    errexit("ERROR: writing to file", NULL);
             }
         }
-    
+        
         /* close & exit */
-        close (sd);
-        exit (0);
+            close (sd);
+            exit (0);
 	}
 	
 	
