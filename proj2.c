@@ -52,7 +52,8 @@ char *processURL(char *url){
         return "invalid";
     }
     else{
-        for(int i=0; i<strlen(HTTP_START); i++){
+        int i=0;
+        for(; i<strlen(HTTP_START); i++){
             processed_url[purl_index] = HTTP_START[i];
             purl_index++;
         }
@@ -81,7 +82,8 @@ char *processURL(char *url){
             purl_index++;
 		}
 	}else{
-		for(int i=0; i<strlen(DEFAULT_PORT_STR); i++){
+        int i=0;
+		for(; i<strlen(DEFAULT_PORT_STR); i++){
             processed_url[purl_index] = DEFAULT_PORT_STR[i];
             purl_index++;
         }
@@ -116,7 +118,8 @@ char *processURL(char *url){
 int getPortFromString(char *port_string){
 	int port = 0;
 	int place = 1;
-	for(int i=strlen(port_string)-1; i>-1; i--){
+    int i=strlen(port_string)-1;
+	for(; i>-1; i--){
 		port += place*(((int) port_string[i])-48);
 		place = place*10;
 	}
@@ -126,7 +129,8 @@ int getPortFromString(char *port_string){
 //Prints the details provided by the user that will be used in the GET
 void printDetails(char *url_array[], char *output_filename){
 	const char *LABELS[3] = {"hostname", "port", "web_filename"};
-	for(int i=0; i<LABELS_LEN; i++){
+    int i=0;
+	for(; i<LABELS_LEN; i++){
 		printf("DET: %s = %s\n", LABELS[i], url_array[i+1]);
 		fflush(stdout);
     }
@@ -148,7 +152,8 @@ void printResponse(unsigned char *contents){
     char *end;
     end = strstr(response, EMPTY_LINE);
     int end_index = (end ? end-response : -1)+1;
-    for(int i=0; i<end_index; i++){
+    int i=0;
+    for(; i<end_index; i++){
         if(response[i]=='\n'){
             printf("\nRSP: ");
             fflush(stdout);
@@ -212,7 +217,8 @@ int main(int argc, char *argv[]){
 
 	
 	//check for flags/invalid arguments
-	for(int i=1; argv[i] != NULL; i++){
+    int i=1;
+	for(; argv[i] != NULL; i++){
 		if(argv[i][0] == '-'){
 			switch(argv[i][1]){
                 case 'u':
