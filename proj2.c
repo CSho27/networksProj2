@@ -162,9 +162,9 @@ void printResponse(unsigned char *contents){
 }
 
 //Writes the the HTML contents of the webpage to a file. Does so by appending an existing file.
-bool printToFile(char *filename, unsigned char *contents, bool header_present){
+bool printToFile(char *filename, unsigned char *contents, int nmemb, bool header_present){
     char *response = (char*) contents;
-    FILE *f = fopen(filename, "a");
+    FILE *f = fopen(filename, "ab");
     if (f == NULL){
         return false;
     }
@@ -174,17 +174,15 @@ bool printToFile(char *filename, unsigned char *contents, bool header_present){
         char *start = strstr(response, EMPTY_LINE);
         start_index = (start ? start-response : -1)+strlen(EMPTY_LINE);
     }
-    
-    for(int i=start_index; i<strlen(response); i++){
-        fwrite(contents, 1, 1, f);
-    }
+    fwrite(contents+start_index, 1, nmemb-start_index, f);
+        
     fclose(f);
     return true;
 } 
 
 //Creates or overwrites the file at the location given by the user to be clear to start appending new content
 bool createAndClearFile(char *filename){
-    FILE *f = fopen(filename, "w");
+    FILE *f = fopen(filename, "wb");
     if(f == NULL){
         return false;
     }
@@ -320,7 +318,6 @@ int main(int argc, char *argv[]){
         
         if(!createAndClearFile(output_filename))
             errexit("ERROR: Error opening file. Check permissions.", NULL);
-        
         int ret = 1;
         bool handled_header = false;
         bool ok = false; //gets 200 OK response
@@ -343,8 +340,8 @@ int main(int argc, char *argv[]){
             else{
                 ok = true;
             }
-            if(save_contents & ok){
-                if(!printToFile(output_filename, buffer, !handled_header))
+            if(save_contents & ok){ 
+                if(!printToFile(output_filename, buffer, ret, !handled_header))
                     errexit("ERROR: writing to file", NULL);
             }
             handled_header = true;
