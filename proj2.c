@@ -346,9 +346,7 @@ int main(int argc, char *argv[]){
             else{
                 ok = true;
             }
-            if(save_contents && ok){ 
-                printf("%d%d", save_contents, ok);
-                fflush(stdout);
+            if(save_contents && ok){
                 if(!printToFile(output_filename, buffer, ret, !handled_header))
                     errexit("ERROR: writing to file", NULL);
             }
