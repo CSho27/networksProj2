@@ -141,7 +141,8 @@ void printRequest(char *args[]){
 }
 
 //Prints the HTTP response just as it was received from the socket
-void printResponse(char *response){
+void printResponse(unsigned char *contents){
+    char *response = (char*) contents;
     printf("RSP: ");
     fflush(stdout);
     char *end;
@@ -161,7 +162,8 @@ void printResponse(char *response){
 }
 
 //Writes the the HTML contents of the webpage to a file. Does so by appending an existing file.
-bool printToFile(char *filename, char *response, bool header_present){
+bool printToFile(char *filename, unsigned char *contents, bool header_present){
+    char *response = (char*) contents;
     FILE *f = fopen(filename, "a");
     if (f == NULL){
         return false;
@@ -174,7 +176,7 @@ bool printToFile(char *filename, char *response, bool header_present){
     }
     
     for(int i=start_index; i<strlen(response); i++){
-        fprintf(f, "%c", response[i]);
+        fwrite(contents, 1, 1, f);
     }
     fclose(f);
     return true;
@@ -279,7 +281,7 @@ int main(int argc, char *argv[]){
 		struct sockaddr_in sin;
         struct hostent *hinfo;
         struct protoent *protoinfo;
-        char buffer [BUFLEN];
+        unsigned char buffer [BUFLEN];
         int sd;
 
         /* lookup the hostname */
@@ -335,7 +337,7 @@ int main(int argc, char *argv[]){
             if(print_response && !handled_header)
                 printResponse(buffer);
             //Only print if response code is 200 OK
-            if(strstr(buffer, "200")==NULL && !handled_header && !ok){
+            if(strstr((char*) buffer, "200")==NULL && !handled_header && !ok){
                 errexit("ERROR: Could not find content at URL and will not write to file.", NULL);
             }
             else{
